@@ -1,0 +1,461 @@
+---
+title: "Applications of the Soybean Expression Atlas in Transcriptomics Research"
+author: "Turquetti-Moraes, Dayana Kelly"
+date: "2024-11-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+This material is an integral part of the article Applications of the Soybean Expression Atlas in Genomics and Transcriptomics Research.
+
+In this section, we will use data from the Soybean Expression Atlas (SEA) to explore the response to infection by the fungal pathogen Colletotrichum truncatum. 
+Specifically, we will generate a gene coexpression network (GCN) to identify key genes associated with immune response pathways.
+
+#Install required packages usign BiocManager
+
+```{r}
+
+install.packages("BiocManager")
+ 
+packages <- c(
+  "SummarizedExperiment",
+  "BioNERO",
+  "cageminer",
+  "STRINGdb",
+  "tidyverse",
+  "here",
+  "ggraph"
+)
+
+BiocManager::install(packages)
+
+```
+
+## Load required packages
+
+```{r}
+
+library(tidyverse)
+library(BioNERO)
+library(SummarizedExperiment)
+library(here)
+
+```
+
+## Load expression data
+
+This study includes soybean (Glycine max) pods that were infected with the 
+fungal pathogen *C. truncatum*. Data for this analysis were obtained from 
+The Soybean Expression Atlas v2 [@almeida2023soybean] under 
+BioProject accession PRJNA800609. 
+The dataset was originally produced by @zhu2022transcriptomic.
+
+```{r}
+
+load(here("data", "se_PRJNA800609.rda"))
+
+```
+
+## Rename object
+
+```{r}
+
+exp <- se_PRJNA800609
+rm(se_PRJNA800609)
+
+```
+
+## Take a look at the object
+
+```{r}
+
+exp
+
+```
+
+## Access the expression matrix
+
+```{r}
+
+head(assay(exp))
+
+```
+
+## Access sample metadata 
+
+```{r}
+
+colData(exp)
+
+```
+
+# Preprocessing data
+
+```{r}
+
+final_exp <- exp_preprocess(
+  exp,
+  min_exp = 5,
+  variance_filter = TRUE,
+  percentile = 0.2,
+  Zk_filtering = FALSE
+)
+
+```
+
+## Data distribution 
+
+```{r}
+
+hist(assay(final_exp)[1, ])
+
+```
+
+# Exploratory data analysis
+
+## Pairwise sample correlation
+
+```{r}
+
+p_heatmap <- plot_heatmap(
+    final_exp, 
+    type = "samplecor", 
+    coldata_cols = "Treatment",
+    show_rownames = FALSE,
+    show_colnames = FALSE
+)
+
+p_heatmap
+
+```
+
+## Perform a principal component analysis (PCA) of the samples. 
+*Note*: Although TPM-normalized data is not the most suitable for PCA, 
+we are using it here to showcase this exploratory analysis through PCA with the 
+plot_PCA() function.
+
+```{r}
+
+p_pca <- plot_PCA(
+    final_exp,
+    metadata_cols = "Treatment",
+)
+
+p_pca
+
+```
+
+
+# Gene Coexpression Network inference
+
+To infer the Gene Co-expression Network (GCN), the first step is to choose an appropriate value for the power parameter, 
+β, which will be applied to the correlation coefficients. The purpose of raising correlations to a power is to increase 
+the contrast between them, thereby enhancing the ability to detect modules. Using higher 
+β values makes the network structure more similar to a scale-free network, though this also lowers the mean connectivity. 
+To balance this trade-off, we will apply the SFT_fit() function.
+
+```{r}
+
+sft <- SFT_fit(
+  final_exp,
+  net_type = "signed hybrid",
+  cor_method = "pearson"
+)
+
+ sft$power
+ 
+ sft$plot
+```
+
+
+## Infer a GCN using estimated β power
+
+```{r}
+
+gcn <- exp2gcn(
+  final_exp,
+  net_type = "signed hybrid",
+  SFTpower = sft$power,
+  cor_method = "pearson"
+)
+
+names(gcn)
+
+```
+
+## Visualize the number of genes per module.
+
+```{r, fig.width=10, fig.height=5}
+
+plot_ngenes_per_module(gcn)
+
+```
+
+## Visualize a heatmap of pairwise correlations between module eigengenes
+
+```{r}
+
+plot_eigengene_network(gcn)
+
+```
+
+## Module-trait associations
+
+```{r}
+# Calculating module-trait correlations
+
+me_trait <- module_trait_cor(
+    exp = final_exp,
+    MEs = gcn$MEs,
+    metadata_cols = c("Treatment", "Cultivar", "Timepoint")
+)
+
+# Taking a look at the results
+
+head(me_trait)
+```
+
+## Plot module expression and trait correlation
+
+```{r}
+
+plot_module_trait_cor(me_trait)
+
+```
+
+The plot indicates that both the grey60 and floralwhite modules are positively correlated with the infected state, suggesting that genes within these modules show elevated expression levels in infected samples. 
+To examine the expression patterns of these modules, we can use the plot_expression_profile() function.
+
+# grey60 expression profile
+
+```{r}
+
+plot_expression_profile(
+    exp = final_exp, 
+    net = gcn,
+    modulename = "grey60",
+    metadata_cols = "Treatment"
+)
+
+```
+
+#floralwhite expression profile
+
+```{r}
+
+plot_expression_profile(
+    exp = final_exp, 
+    net = gcn,
+    modulename = "floralwhite",
+    metadata_cols = "Treatment"
+)
+
+```
+
+# Enrichment analyses
+
+After identifying modules of interest, the next step is often to investigate the functions of the genes within them. 
+This can be achieved using the module_enrichment() function, which conducts an overrepresentation analysis for various 
+functional terms, such as pathways and Gene Ontology (GO) terms.
+
+## Load annotation data - this is a list of data frames
+
+```{r}
+
+load("gma_annotation.rda")
+
+```
+
+## Taking a look at the data
+
+```{r}
+
+names(gma_annotation)
+
+```
+
+## Taking a look at the Mapman data
+
+```{r}
+
+head(gma_annotation$MapMan)
+
+```
+
+## Taking a look at the InterPro data
+
+```{r}
+
+head(gma_annotation$InterPro)
+
+```
+
+## Mapman enrichment
+
+```{r}
+
+sea_mapman <- module_enrichment(
+  net = gcn,
+  background_genes = rownames(final_exp),
+  annotation = gma_annotation$MapMan
+)
+
+head(sea_mapman)
+```
+
+### InterPro enrichment
+
+```{r}
+
+sea_interpro <- module_enrichment(
+    net = gcn,
+    background_genes = rownames(final_exp),
+    annotation = gma_annotation$InterPro
+)
+
+head(sea_interpro)
+
+
+```
+
+## Enriched modules
+
+```{r}
+
+length(unique(sea_mapman$Module))
+ 
+```
+ 
+# Working with grey60 and floralwhite coexpression modules
+
+## Select enrichment of modules grey60 and floralwhite
+
+### Mapman
+
+```{r}
+# grey60 module
+
+grey60_mapman <- sea_mapman %>%
+  filter(Module=="grey60")
+
+# floralwhite module
+
+floral_mapman <- sea_mapman %>%
+  filter(Module=="floralwhite")
+
+```
+
+### Interpro
+
+```{r}
+
+# grey60 module
+
+grey60_interpro <- sea_interpro %>%
+  filter(Module=="grey60")
+
+# floralwhite module
+
+floral_interpro <- sea_interpro %>%
+  filter(Module=="floralwhite")
+
+```
+
+# Plot enrichment analysis
+
+## grey60 module
+
+```{r, fig.width=10, fig.height=5}
+
+# Calculate the enrichment rate of genes in grey60 module
+
+top10_grey60_interpro <- grey60_interpro %>%
+  mutate(rate = genes / all) %>%
+  arrange(padj) %>%
+  slice_head(n = 10)
+
+# Bubble plot module grey60
+
+ggplot(top10_grey60_interpro, aes(x = reorder(TermID, padj), y = rate, size = genes, fill = padj)) +
+  geom_point(shape = 21, color = "black", alpha = 0.8) +
+  scale_size_continuous(name = "Number of Genes", range = c(3, 10)) +
+  scale_fill_gradientn(
+    name = "Adjusted p-value",
+    colors = c("#2166ac", "#92c5de", "#f4a582", "#b2182b"),
+    trans = 'log10',
+    guide = guide_colorbar(reverse = TRUE)
+  ) +
+  labs(
+    x = "Enriched Terms",
+    y = "Gene Proportion (Rate)",
+    title = "Top 10 Enriched Terms Bubble Plot"
+  ) +
+  theme_classic(base_size = 14) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+    axis.title.x = element_text(margin = margin(t = 10), face = "bold"),
+    axis.title.y = element_text(margin = margin(r = 10), face = "bold"),
+    legend.position = "right",
+    legend.box.margin = margin(10, 10, 10, 10),
+    legend.key.height = unit(0.8, "cm"),
+    legend.key.width = unit(0.5, "cm")
+  ) +
+  coord_flip()
+
+```
+
+## floralwhite module
+
+```{r, fig.width=10, fig.height=5}
+
+# Calculate the enrichment rate of genes in floralwhite module
+
+top10_floralwhite_interpro <- floral_interpro %>%
+  mutate(rate = genes / all) %>%
+  arrange(padj) %>%
+  slice_head(n = 10)
+
+# Bubble plot module floralwhite
+
+ggplot(top10_floralwhite_interpro, aes(x = reorder(TermID, padj), y = rate, size = genes, fill = padj)) +
+  geom_point(shape = 21, color = "black", alpha = 0.8) +
+  scale_size_continuous(name = "# Genes", range = c(3, 10)) +
+  scale_fill_gradientn(
+    name = "adj p-value",
+    colors = c("#2166ac", "#92c5de", "#f4a582", "#b2182b"),
+    trans = 'log10',
+    guide = guide_colorbar(reverse = TRUE)
+  ) +
+  labs(
+    x = "Enrichiment",
+    y = "Rate",
+    title = "Top 10 Floralwhite"
+  ) +
+  theme_classic(base_size = 14) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+    axis.title.x = element_text(margin = margin(t = 10), face = "bold"),
+    axis.title.y = element_text(margin = margin(r = 10), face = "bold"),
+    legend.position = "right",
+    legend.box.margin = margin(10, 10, 10, 10),
+    legend.key.height = unit(0.8, "cm"),
+    legend.key.width = unit(0.5, "cm")
+  ) +
+  coord_flip()
+
+```
+
+# Hub genes 
+
+```{r}
+
+hubs <- get_hubs_gcn(exp = final_exp, net = gcn)
+head(hubs)
+
+```
+
