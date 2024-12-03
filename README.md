@@ -1,7 +1,9 @@
 # Applications of the Soybean Expression Atlas in Genomics and Transcriptomics Research
 
-This repository is part of the chapter titled **"Applications of the Soybean Expression Atlas in Genomics and Transcriptomics Research"**, which explores the use of the soybean expression atlas in genomics and transcriptomics studies. 
-The chapter provides an in-depth overview of how to use transcriptomic data from Soybean Expression Atlas (https://soyatlas.venanciogroup.uenf.br/) to understand the molecular mechanisms behind important traits in soybean, such as stress tolerance and disease resistance.
+This repository is part of the chapter titled **"Applications of the Soybean Expression Atlas in Genomics and Transcriptomics Research"**, 
+which explores the use of the soybean expression atlas in genomics and transcriptomics studies. 
+The chapter provides an in-depth overview of how to use transcriptomic data from Soybean Expression Atlas
+(https://soyatlas.venanciogroup.uenf.br/) to understand the molecular mechanisms behind important traits in soybean, such as stress tolerance and disease resistance.
 
 ## Contents
 
