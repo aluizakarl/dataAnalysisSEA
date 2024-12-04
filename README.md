@@ -13,8 +13,8 @@ This repository includes the following:
 
 ### Subdirectories
 
-- **`cTruncatumAnalysis`**: Contains data and R scripts for co-expression network analysis and gene ontology enrichment. Contributions by @dayana-turquetti.
-- **`hGlycines`**: Includes genetic association data, transcriptome data, and a Python script for differential expression analysis. By @aluizakarl 
+- **`cTruncatumAnalysis`**: Contains data and R scripts for co-expression network analysis and gene ontology enrichment. Code and analysis by [@dayana-turquetti](https://github.com/dayana-turquetti)
+- **`hGlycines`**: Includes genetic association data, transcriptome data, and a Python script for differential expression analysis. 
 
 ## How to Use
 
