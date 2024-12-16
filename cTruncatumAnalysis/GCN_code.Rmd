@@ -57,7 +57,7 @@ The dataset was originally produced by @zhu2022transcriptomic.
 
 ```{r}
 
-load(here("data", "se_PRJNA800609.rda"))
+load(here("se_PRJNA800609.rda"))
 
 ```
 
